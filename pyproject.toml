@@ -1,0 +1,12 @@
+[tool.black]
+exclude = '''
+(
+  /(
+    | .+/migrations
+  )/
+)
+'''
+
+[tool.isort]
+profile = "black"
+skip_glob = "*/migrations/*"
