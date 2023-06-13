@@ -14,7 +14,13 @@ def cli():
 
 
 @cli.command("execute-job")
-@click.option("-s", "--serializer", "serializer_path", type=str, help="Path to serializer's class")
+@click.option(
+    "-s",
+    "--serializer",
+    "serializer_path",
+    type=str,
+    help="Path to serializer's class",
+)
 @click.argument("job-spec", type=str)
 def execute_job_cli(serializer_path, job_spec):
     if not serializer_path:
