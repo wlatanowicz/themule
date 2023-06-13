@@ -25,7 +25,7 @@ class BotoClient:
             containerOverrides={
                 "command": [
                     "themule",
-                    "executejob",
+                    "execute-job",
                     "--serializer",
                     serializer.get_path(),
                     serialized_job,
