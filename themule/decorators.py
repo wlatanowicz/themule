@@ -3,8 +3,7 @@ from .job import JobFunction
 
 def job(**kwargs):
     def inner(fn):
-        job_function = JobFunction(fn, **kwargs)
-        job_function.augment_function(fn)
-        return fn
+        job_function = JobFunction.from_function(fn, **kwargs)
+        return job_function
 
     return inner

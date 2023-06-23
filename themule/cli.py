@@ -3,6 +3,7 @@ from typing import Type
 
 import click
 
+from .conf import settings
 from .executor import execute_job
 from .import_helpers import import_by_path
 from .serializers import DEFAULT_SERIALIZER, BaseSerializer
@@ -23,15 +24,14 @@ def cli():
 )
 @click.argument("job-spec", type=str)
 def execute_job_cli(serializer_path, job_spec):
-    setup = os.environ.get("THEMULE_SETUP_CALLBACK")
-    if setup:
-        setup_func = import_by_path(setup)
-        setup_func()
+    bootstrap = settings.BOOTSTRAP_CALLBACK
+    if bootstrap:
+        bootstrap_func = import_by_path(bootstrap)
+        bootstrap_func()
 
     if not serializer_path:
-        serializer_path = os.environ.get(
-            "THEMULE_JOB_SERIALIZER", default=DEFAULT_SERIALIZER
-        )
+        serializer_path = settings.JOB_SERIALIZER
+
     serializer_class: Type[BaseSerializer] = import_by_path(serializer_path)
     serializer = serializer_class()
     job = serializer.unserialize(job_spec)
