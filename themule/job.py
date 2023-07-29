@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from threading import Thread
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 from uuid import UUID, uuid4
 
-from .boto_client import BotoClient
 from .conf import settings
 from .import_helpers import import_by_path
-from .serializers import DEFAULT_SERIALIZER, BaseSerializer
+
+if TYPE_CHECKING:
+    from .backends import BaseBackend
+    from .serializers import BaseSerializer
 
 
 @dataclass
@@ -15,7 +18,13 @@ class Job:
     func: str
     args: List[Any]
     kwargs: Dict[str, Any]
-    aws_job_id: Optional[UUID] = None
+
+
+@dataclass
+class StartedJob:
+    backend_class: str
+    job: Job
+    job_id: Optional[str] = None
 
 
 class JobFunction:
@@ -25,14 +34,14 @@ class JobFunction:
         *,
         function: Optional[Callable] = None,
         serializer: Optional[Union[BaseSerializer, str]] = None,
-        job_definition: Optional[str] = None,
-        job_queue: Optional[str] = None,
+        backend: Optional[Union[BaseBackend, str]] = None,
+        **kwargs,
     ) -> None:
         self.function_path = function_path
         self.function = function
         self.serializer = serializer
-        self.job_definition = job_definition
-        self.job_queue = job_queue
+        self.backend = backend
+        self.additional_kwargs = kwargs
 
     @classmethod
     def from_function(
@@ -62,36 +71,22 @@ class JobFunction:
         function_name = function.__name__
         return f"{module_path}.{function_name}"
 
-    def submit(self, *args, **kwargs):
+    def submit(self, *args, **kwargs) -> StartedJob:
         job = Job(id=uuid4(), func=self.function_path, args=args, kwargs=kwargs)
 
-        if settings.ALWAYS_EAGER:
-            thread = Thread(target=function, args=args, kwargs=kwargs)
-            thread.start()
-            job.aws_job_id = None
-        else:
-            boto_client = BotoClient()
-            response = boto_client.submit_job(
-                job,
-                self.get_serializer(),
-                self.get_job_queue(),
-                self.get_job_definition(),
-            )
-            aws_job_id = response.get("jobId")
-            job.aws_job_id = UUID(aws_job_id)
+        serializer = self.get_serializer()
+        backend = self.get_backend()
 
-        return job
-
-    def get_value_from_settings(self, key, default=None, option_name=None):
-        assert default is not None or option_name is not None
-        value = getattr(settings, key)
-        if value is None:
-            raise ValueError(
-                f"You have to set `{option_name}` in the job decorator or set the system-wide default with `THEMULE_{key}` environmental variable"
-            )
-        return value
+        started_job = backend.submit_job(
+            job,
+            serializer,
+            **self.additional_kwargs,
+        )
+        return started_job
 
     def get_serializer(self) -> BaseSerializer:
+        from .serializers import BaseSerializer
+
         if isinstance(self.serializer, BaseSerializer):
             return self.serializer
 
@@ -100,22 +95,21 @@ class JobFunction:
         ):
             return self.serializer()
 
-        serializer_class_path = self.get_value_from_settings(
-            "JOB_SERIALIZER",
-            default=DEFAULT_SERIALIZER,
-        )
+        serializer_class_path = settings.JOB_SERIALIZER
         serializer_class = import_by_path(serializer_class_path)
         assert issubclass(serializer_class, BaseSerializer)
         return serializer_class()
 
-    def get_job_definition(self) -> str:
-        if self.job_definition:
-            return self.job_definition
-        return self.get_value_from_settings(
-            "JOB_DEFINITION", option_name="job_definition"
-        )
+    def get_backend(self) -> BaseBackend:
+        from .backends import BaseBackend
 
-    def get_job_queue(self) -> str:
-        if self.job_queue:
-            return self.job_queue
-        return self.get_value_from_settings("JOB_QUEUE", option_name="job_queue")
+        if isinstance(self.backend, BaseBackend):
+            return self.backend
+
+        if isinstance(self.backend, type) and issubclass(self.backend, BaseBackend):
+            return self.backend()
+
+        backend_class_path = settings.BACKEND
+        backend_class = import_by_path(backend_class_path)
+        assert issubclass(backend_class, BaseBackend)
+        return backend_class()
