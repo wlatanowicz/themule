@@ -51,6 +51,21 @@ def get_about():
 about = get_about()
 
 
+BUNDLES = (
+    "aws_batch",
+    "docker",
+)
+
+
+def extras(*p):
+    """Parse requirement in the requirements/extras/ directory."""
+    return reqs("extras", *p)
+
+def extras_require():
+    """Get map of all extra requirements."""
+    return {x: extras(x + ".txt") for x in BUNDLES}
+
+
 setup(
     name="themule",
     version=about["__version__"],
@@ -64,6 +79,7 @@ setup(
     packages=find_packages(exclude=["tests*",]),
     zip_safe=False,
     install_requires=reqs("base.txt"),
+    extras_require=extras_require(),
     tests_require=reqs("tests.txt"),
     classifiers=[
         "Programming Language :: Python :: 3.9",
