@@ -4,6 +4,8 @@ import json
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from .conf import NOTSET, settings
+
 if TYPE_CHECKING:
     from .job import Job
 
@@ -12,6 +14,9 @@ DEFAULT_SERIALIZER = "themule.serializers.JsonSerializer"
 
 
 class BaseSerializer:
+    def __init__(self, **options) -> None:
+        pass
+
     def serialize(self, job: Job) -> str:
         raise NotImplementedError()
 
@@ -20,6 +25,15 @@ class BaseSerializer:
 
     def get_path(self):
         return f"{self.__module__}.{self.__class__.__name__}"
+
+    def get_option_value(self, options, option, default=NOTSET, cast=None):
+        return settings.get_value_for_job(
+            options,
+            self.OPTION_PREFIX,
+            option,
+            default=default,
+            cast=cast,
+        )
 
 
 class JsonSerializer(BaseSerializer):

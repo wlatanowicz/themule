@@ -74,17 +74,16 @@ class JobFunction:
     def submit(self, *args, **kwargs) -> StartedJob:
         job = Job(id=uuid4(), func=self.function_path, args=args, kwargs=kwargs)
 
-        serializer = self.get_serializer()
-        backend = self.get_backend()
+        serializer = self.get_serializer(self.additional_kwargs)
+        backend = self.get_backend(self.additional_kwargs)
 
         started_job = backend.submit_job(
             job,
             serializer,
-            **self.additional_kwargs,
         )
         return started_job
 
-    def get_serializer(self) -> BaseSerializer:
+    def get_serializer(self, options) -> BaseSerializer:
         from .serializers import BaseSerializer
 
         if isinstance(self.serializer, BaseSerializer):
@@ -93,23 +92,23 @@ class JobFunction:
         if isinstance(self.serializer, type) and issubclass(
             self.serializer, BaseSerializer
         ):
-            return self.serializer()
+            return self.serializer(**options)
 
         serializer_class_path = settings.JOB_SERIALIZER
         serializer_class = import_by_path(serializer_class_path)
         assert issubclass(serializer_class, BaseSerializer)
-        return serializer_class()
+        return serializer_class(**options)
 
-    def get_backend(self) -> BaseBackend:
+    def get_backend(self, options) -> BaseBackend:
         from .backends import BaseBackend
 
         if isinstance(self.backend, BaseBackend):
             return self.backend
 
         if isinstance(self.backend, type) and issubclass(self.backend, BaseBackend):
-            return self.backend()
+            return self.backend(**options)
 
         backend_class_path = settings.BACKEND
         backend_class = import_by_path(backend_class_path)
         assert issubclass(backend_class, BaseBackend)
-        return backend_class()
+        return backend_class(**options)

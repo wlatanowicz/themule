@@ -17,7 +17,10 @@ DEFAULT_BACKEND = "themule.backends.AwsBatchBackend"
 class BaseBackend:
     OPTION_PREFIX = "base"
 
-    def submit_job(self, job: Job, serializer: BaseSerializer, **options) -> StartedJob:
+    def __init__(self, **options) -> None:
+        pass
+
+    def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         raise NotImplementedError()
 
     def get_path(self):
@@ -36,7 +39,11 @@ class BaseBackend:
 class AwsBatchBackend(BaseBackend):
     OPTION_PREFIX = "aws_batch"
 
-    def submit_job(self, job: Job, serializer: BaseSerializer, **options) -> StartedJob:
+    def __init__(self, **options) -> None:
+        self.queue_name = self.get_option_value(options, "queue_name")
+        self.job_definition = self.get_option_value(options, "job_definition")
+
+    def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         try:
             import boto3
         except ImportError:
@@ -44,14 +51,11 @@ class AwsBatchBackend(BaseBackend):
 
         serialized_job = serializer.serialize(job)
 
-        queue_name = self.get_option_value(options, "queue_name")
-        job_definition = self.get_option_value(options, "job_definition")
-
         client = boto3.client("batch")
         response = client.submit_job(
             jobName=str(job.id),
-            jobQueue=queue_name,
-            jobDefinition=job_definition,
+            jobQueue=self.queue_name,
+            jobDefinition=self.job_definition,
             containerOverrides={
                 "command": [
                     "themule",
@@ -75,7 +79,22 @@ class AwsBatchBackend(BaseBackend):
 class LocalDockerBackend(BaseBackend):
     OPTION_PREFIX = "docker"
 
-    def submit_job(self, job: Job, serializer: BaseSerializer, **options) -> StartedJob:
+    def __init__(self, **options) -> None:
+        self.docker_image = self.get_option_value(options, "image")
+        self.entrypoint = self.get_option_value(
+            options, "entrypoint", default=None, cast=list
+        )
+        self.environment = self.get_option_value(
+            options, "environment", default={}, cast=dict
+        )
+        self.pass_environment = self.get_option_value(
+            options, "pass_environment", default=True, cast=bool
+        )
+        self.auto_remove = self.get_option_value(
+            options, "auto_remove", default=True, cast=bool
+        )
+
+    def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         try:
             import docker
         except ImportError:
@@ -83,21 +102,8 @@ class LocalDockerBackend(BaseBackend):
 
         serialized_job = serializer.serialize(job)
 
-        docker_image = self.get_option_value(options, "image")
-        entrypoint = self.get_option_value(
-            options, "entrypoint", default=None, cast=list
-        )
-        environment = self.get_option_value(
-            options, "environment", default={}, cast=dict
-        )
-        pass_environment = self.get_option_value(
-            options, "pass_environment", default=True, cast=bool
-        )
-        auto_remove = self.get_option_value(
-            options, "auto_remove", default=True, cast=bool
-        )
-
-        if pass_environment:
+        environment = self.environment
+        if self.pass_environment:
             environment = {
                 **os.environ,
                 **environment,
@@ -113,11 +119,11 @@ class LocalDockerBackend(BaseBackend):
 
         client = docker.from_env()
         container = client.containers.run(
-            docker_image,
+            self.docker_image,
             docker_command,
-            entrypoint=entrypoint,
+            entrypoint=self.entrypoint,
             environment=environment,
-            auto_remove=auto_remove,
+            auto_remove=self.auto_remove,
             detach=True,
         )
 
@@ -131,7 +137,7 @@ class LocalDockerBackend(BaseBackend):
 
 
 class LocalProcess(BaseBackend):
-    def submit_job(self, job: Job, serializer: BaseSerializer, **options) -> StartedJob:
+    def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         import subprocess
 
         serialized_job = serializer.serialize(job)
