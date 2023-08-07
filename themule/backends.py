@@ -93,6 +93,9 @@ class LocalDockerBackend(BaseBackend):
         self.auto_remove = self.get_option_value(
             options, "auto_remove", default=True, cast=bool
         )
+        self.run_options = self.get_option_value(
+            options, "run_options", default={}, cast=dict
+        )
 
     def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         try:
@@ -118,13 +121,19 @@ class LocalDockerBackend(BaseBackend):
         ]
 
         client = docker.from_env()
+
+        run_kwargs = {
+            "entrypoint": self.entrypoint,
+            "environment": environment,
+            "auto_remove": self.auto_remove,
+            **self.run_options,
+        }
+
         container = client.containers.run(
             self.docker_image,
             docker_command,
-            entrypoint=self.entrypoint,
-            environment=environment,
-            auto_remove=self.auto_remove,
             detach=True,
+            **run_kwargs,
         )
 
         job_id = container.id
