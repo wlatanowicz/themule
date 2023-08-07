@@ -62,3 +62,4 @@ docker_entrypoint | THEMULE_DOCKER_ENTRYPOINT | No | None | Override of the cont
 docker_pass_environment | THEMULE_DOCKER_PASS_ENVIRONMENT | No | True | Passes application's env to worker container if true
 docker_environment | THEMULE_DOCKER_ENVIRONMENT | No | None | Additional container environment variables
 docker_auto_remove | THEMULE_DOCKER_AUTO_REMOVE | No | True | Removes the container after worker exit if true
+run_options | THEMULE_DOCKER_RUN_OPTIONS | No | - | Allows to set docker run options
