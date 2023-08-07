@@ -1,0 +1,15 @@
+version: '3.0'
+services:
+  main:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile
+    image: themule-example-image
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - THEMULE_BACKEND=themule.backends.LocalDockerBackend
+      - THEMULE_DOCKER_IMAGE=themule-example-image
+      - THEMULE_DOCKER_AUTO_REMOVE=false
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - PYTHONPATH=/app
