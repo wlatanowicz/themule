@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -38,13 +39,15 @@ class BaseSerializer:
 
 class JsonSerializer(BaseSerializer):
     def serialize(self, job: Job) -> str:
+        payload = {
+            "id": str(job.id),
+            "func": job.func,
+            "args": job.args,
+            "kwargs": job.kwargs,
+        }
         return json.dumps(
-            {
-                "id": str(job.id),
-                "func": job.func,
-                "args": job.args,
-                "kwargs": job.kwargs,
-            }
+            payload,
+            default=self._json_serializer,
         )
 
     def unserialize(self, data: str) -> Job:
@@ -57,3 +60,9 @@ class JsonSerializer(BaseSerializer):
             args=json_payload["args"],
             kwargs=json_payload["kwargs"],
         )
+
+    def _json_serializer(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+
+        raise TypeError(f"Type {type(obj)} is not JSON serializable")
