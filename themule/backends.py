@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING
 
 from .conf import NOTSET, settings
+from .exceptions import ConfigurationError
 from .job import StartedJob
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ class AwsBatchBackend(BaseBackend):
         try:
             import boto3
         except ImportError:
-            raise ValueError("AWS support not installed")
+            raise ConfigurationError("AWS support not installed")
 
         serialized_job = serializer.serialize(job)
 
@@ -101,7 +102,7 @@ class LocalDockerBackend(BaseBackend):
         try:
             import docker
         except ImportError:
-            raise ValueError("Docker support not installed")
+            raise ConfigurationError("Docker support not installed")
 
         serialized_job = serializer.serialize(job)
 

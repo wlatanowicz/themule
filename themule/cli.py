@@ -37,3 +37,5 @@ def execute_job_cli(serializer_path, job_spec):
     job = serializer.unserialize(job_spec)
 
     execute_job(job)
+
+    serializer.cleanup(job)
