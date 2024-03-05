@@ -54,6 +54,7 @@ about = get_about()
 BUNDLES = (
     "aws_batch",
     "docker",
+    "redis",
 )
 
 
