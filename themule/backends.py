@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Generator
 
 from .conf import NOTSET, settings
 from .exceptions import ConfigurationError
@@ -24,6 +25,9 @@ class BaseBackend:
     def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         raise NotImplementedError()
 
+    def purge(self):
+        raise NotImplementedError()
+
     def get_path(self):
         return f"{self.__module__}.{self.__class__.__name__}"
 
@@ -40,9 +44,19 @@ class BaseBackend:
 class AwsBatchBackend(BaseBackend):
     OPTION_PREFIX = "aws_batch"
 
+    @dataclass
+    class _QueuedJob:
+        job_id: str
+
     def __init__(self, **options) -> None:
         self.queue_name = self.get_option_value(options, "queue_name")
         self.job_definition = self.get_option_value(options, "job_definition")
+
+    def purge(self):
+        statuses = ("SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING")
+        for status in statuses:
+            for job in self._list_jobs(status):
+                self._terminate_job(job, "Queue purged")
 
     def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
         try:
@@ -74,6 +88,49 @@ class AwsBatchBackend(BaseBackend):
             self.get_path(),
             job,
             job_id,
+        )
+
+    def _list_jobs(
+        self, status: str | None = None
+    ) -> Generator[_QueuedJob, None, None]:
+        try:
+            import boto3
+        except ImportError:
+            raise ConfigurationError("AWS support not installed")
+
+        is_first = True
+        client = boto3.client("batch")
+
+        while is_first or next_token:
+            is_first = False
+            kwargs = {}
+
+            if next_token:
+                kwargs["nextToken"] = next_token
+
+            if status:
+                kwargs["jobStatus"] = status
+
+            result = client.list_jobs(
+                jobQueue=self.queue_name,
+                **kwargs,
+            )
+            next_token = result.get("nextToken")
+            for job in result.get("jobSummaryList", []):
+                yield self._QueuedJob(
+                    job_id=job["jobId"],
+                )
+
+    def _terminate_job(self, job: _QueuedJob, reason: str):
+        try:
+            import boto3
+        except ImportError:
+            raise ConfigurationError("AWS support not installed")
+
+        client = boto3.client("batch")
+        client.terminate_job(
+            jobId=job.job_id,
+            reason=reason,
         )
 
 
