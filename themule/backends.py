@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
+from uuid import uuid4
 
 from .conf import NOTSET, settings
 from .exceptions import ConfigurationError
+from .import_helpers import import_by_path
 from .job import StartedJob
 
 if TYPE_CHECKING:
@@ -220,6 +222,20 @@ class LocalProcess(BaseBackend):
         process = subprocess.Popen(command)
 
         job_id = process.pid
+
+        return StartedJob(
+            self.get_path(),
+            job,
+            job_id,
+        )
+
+
+class Immediate(BaseBackend):
+    def submit_job(self, job: Job, serializer: BaseSerializer) -> StartedJob:
+        func = import_by_path(job.func)
+
+        func(*job.args, **job.kwargs)
+        job_id = str(uuid4())
 
         return StartedJob(
             self.get_path(),
